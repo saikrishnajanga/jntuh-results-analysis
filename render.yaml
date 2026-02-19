@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: jntu-result-analysis-collegewise
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
