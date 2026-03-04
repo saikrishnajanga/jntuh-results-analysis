@@ -158,10 +158,16 @@ def compare():
     return render_template("compare.html", result=result)
 
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
 @app.route("/download")
 def download():
     return send_file("uploads/output.xlsx", as_attachment=True)
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
