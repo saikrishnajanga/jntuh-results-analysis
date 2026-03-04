@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html data-theme="day">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Semesters — JNTU Topper Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #f0f4f8;
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --bg-card-solid: #ffffff;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
+            --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --accent-1: #667eea;
+            --accent-2: #764ba2;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
+            --table-header-bg: linear-gradient(135deg, #667eea, #764ba2);
+            --table-stripe: rgba(102, 126, 234, 0.04);
+            --success: #48bb78;
+            --danger: #fc8181;
+            --warning: #ecc94b;
+            --toggle-bg: #e2e8f0;
+            --toggle-knob: #667eea;
+            --search-bg: #ffffff;
+        }
+
+        [data-theme="night"] {
+            --bg-primary: #0f0f23;
+            --bg-card: rgba(30, 30, 60, 0.85);
+            --bg-card-solid: #1a1a3e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --text-muted: #718096;
+            --accent-gradient: linear-gradient(135deg, #7f5af0 0%, #e040fb 100%);
+            --accent-1: #7f5af0;
+            --accent-2: #e040fb;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --shadow-hover: 0 12px 40px rgba(127, 90, 240, 0.25);
+            --table-header-bg: linear-gradient(135deg, #7f5af0, #e040fb);
+            --table-stripe: rgba(127, 90, 240, 0.06);
+            --success: #68d391;
+            --danger: #fc8181;
+            --warning: #fbd38d;
+            --toggle-bg: #2d2d5e;
+            --toggle-knob: #7f5af0;
+            --search-bg: #1e1e3e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background 0.5s, color 0.5s;
+            min-height: 100vh;
+            font-size: 14px;
+        }
+
+        [data-theme="day"] body {
+            background: linear-gradient(135deg, #f0f4f8, #e8edf5, #f0f4f8);
+        }
+
+        [data-theme="night"] body {
+            background: linear-gradient(135deg, #0f0f23, #1a1a3e, #0f0f23);
+        }
+
+        .app-header {
+            background: var(--accent-gradient);
+            padding: 18px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 60%);
+            animation: shimmer 8s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+
+            0%,
+            100% {
+                transform: translateX(-30%) translateY(-30%);
+            }
+
+            50% {
+                transform: translateX(30%) translateY(30%);
+            }
+        }
+
+        .app-header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: white;
+            position: relative;
+            z-index: 1;
+        }
+
+        .app-header .subtitle {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-links {
+            position: relative;
+            z-index: 1;
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 6px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            transition: all 0.3s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .theme-toggle-wrapper {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 1000;
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 50px;
+            padding: 6px 14px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle:hover {
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        .theme-toggle .icon {
+            font-size: 1.1rem;
+        }
+
+        .theme-toggle .toggle-track {
+            width: 40px;
+            height: 22px;
+            background: var(--toggle-bg);
+            border-radius: 11px;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .theme-toggle .toggle-knob {
+            width: 16px;
+            height: 16px;
+            background: var(--toggle-knob);
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        [data-theme="night"] .toggle-knob {
+            left: 21px;
+        }
+
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 22px;
+            margin-top: 20px;
+            box-shadow: var(--shadow);
+            transition: all 0.4s;
+            animation: fadeInUp 0.5s ease forwards;
+            opacity: 0;
+        }
+
+        .glass-card:hover {
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .glass-card:nth-child(1) {
+            animation-delay: .05s
+        }
+
+        .glass-card:nth-child(2) {
+            animation-delay: .1s
+        }
+
+        .glass-card:nth-child(3) {
+            animation-delay: .15s
+        }
+
+        .glass-card:nth-child(4) {
+            animation-delay: .2s
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+        }
+
+        .section-title .badge-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: white;
+            background: var(--accent-gradient);
+        }
+
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .upload-box {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+            background: var(--bg-card);
+        }
+
+        .upload-box:hover {
+            border-color: var(--accent-1);
+        }
+
+        .upload-box h6 {
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .btn-upload {
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
+            padding: 10px 28px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            color: white;
+        }
+
+        .form-control {
+            background: var(--bg-card-solid);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 10px;
+            padding: 9px 12px;
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+            background: var(--bg-card-solid);
+            color: var(--text-primary);
+        }
+
+        /* Compare cards */
+        .compare-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .compare-card {
+            border-radius: 14px;
+            padding: 18px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+
+        .compare-card h6 {
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 8px;
+        }
+
+        .metric .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric .value {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .metric .value.up {
+            color: var(--success);
+        }
+
+        .metric .value.down {
+            color: var(--danger);
+        }
+
+        /* Trend badges */
+        .trend-row {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+
+        .trend-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .trend-badge.improved {
+            background: rgba(72, 187, 120, 0.12);
+            color: var(--success);
+        }
+
+        .trend-badge.declined {
+            background: rgba(252, 129, 129, 0.12);
+            color: var(--danger);
+        }
+
+        .trend-badge.same {
+            background: rgba(236, 201, 75, 0.12);
+            color: var(--warning);
+        }
+
+        .trend-badge .count {
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        /* Search */
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--search-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px 14px;
+            margin-bottom: 14px;
+            transition: all 0.3s;
+            max-width: 400px;
+        }
+
+        .search-box:focus-within {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+        }
+
+        .search-box input {
+            border: none;
+            background: transparent;
+            outline: none;
+            flex: 1;
+            color: var(--text-primary);
+            font-family: 'Inter';
+            font-size: 0.85rem;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: -8px;
+            margin-bottom: 10px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .table {
+            width: 100% !important;
+            margin: auto;
+            border-radius: 12px;
+            overflow: hidden;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .table thead th {
+            background: var(--table-header-bg) !important;
+            color: white !important;
+            font-weight: 600;
+            padding: 10px 14px;
+            border: none !important;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .table tbody td {
+            padding: 8px 14px;
+            border-color: var(--border-color) !important;
+            color: var(--text-primary);
+            background: var(--bg-card-solid);
+            font-size: 0.85rem;
+        }
+
+        .table tbody tr:nth-child(even) td {
+            background: var(--table-stripe);
+        }
+
+        .table tbody tr:hover td {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .table tbody tr.hidden-row {
+            display: none;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 16px;
+        }
+
+        .chart-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .chart-wrap h5 {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+
+        .chart-wrap canvas {
+            max-height: 260px;
+        }
+
+        .app-footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 32px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        @media(max-width:768px) {
+
+            .compare-grid,
+            .upload-grid,
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .app-header h1 {
+                font-size: 1.3rem;
+            }
+
+            .theme-toggle-wrapper {
+                top: 10px;
+                right: 10px;
+            }
+
+            .theme-toggle {
+                padding: 5px 8px;
+            }
+
+            .glass-card {
+                padding: 16px;
+            }
+
+            .nav-links a {
+                padding: 5px 12px;
+                font-size: 0.78rem;
+            }
+        }
+
+        @media(max-width:480px) {
+            .app-header h1 {
+                font-size: 1.1rem;
+            }
+
+            .trend-row {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .search-box {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="theme-toggle-wrapper">
+        <div class="theme-toggle" onclick="toggleTheme()">
+            <span class="icon" id="themeIcon">☀️</span>
+            <div class="toggle-track">
+                <div class="toggle-knob"></div>
+            </div>
+            <span class="icon" id="themeIcon2">🌙</span>
+        </div>
+    </div>
+
+    <div class="app-header text-center">
+        <h1>🔀 Compare Semesters</h1>
+        <p class="subtitle">Upload two result files to see performance trends</p>
+        <div class="nav-links">
+            <a href="/">📄 Single Analysis</a>
+            <a href="/compare" class="active">🔀 Compare Semesters</a>
+        </div>
+    </div>
+
+    <div class="container" style="max-width:960px;">
+
+        <div class="glass-card">
+            <div class="section-title">
+                <span class="badge-icon">📂</span> Upload Two Semesters
+            </div>
+            <form method="POST" enctype="multipart/form-data">
+                <div class="upload-grid">
+                    <div class="upload-box">
+                        <h6>📘 Semester 1 (Earlier)</h6>
+                        <input type="file" name="file1" required class="form-control mb-2">
+                    </div>
+                    <div class="upload-box">
+                        <h6>📗 Semester 2 (Later)</h6>
+                        <input type="file" name="file2" required class="form-control mb-2">
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <button type="submit" class="btn btn-upload">🔍 Compare Results</button>
+                </div>
+            </form>
+        </div>
+
+        {% if result %}
+        <!-- Overview -->
+        <div class="glass-card">
+            <div class="section-title">
+                <span class="badge-icon">📊</span> Semester Overview
+            </div>
+            <div class="compare-grid">
+                <div class="compare-card">
+                    <h6>📘 Semester 1</h6>
+                    <div class="metric-row">
+                        <div class="metric">
+                            <div class="label">Total</div>
+                            <div class="value">{{ result.sem1.total }}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Passed</div>
+                            <div class="value up">{{ result.sem1.passed }} <small>({{ result.sem1.pass_pct }}%)</small>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Failed</div>
+                            <div class="value down">{{ result.sem1.failed }}</div>
+                        </div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric">
+                            <div class="label">Avg SGPA</div>
+                            <div class="value">{{ result.sem1.avg_sgpa }}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Avg Marks</div>
+                            <div class="value">{{ result.sem1.avg_marks }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="compare-card">
+                    <h6>📗 Semester 2</h6>
+                    <div class="metric-row">
+                        <div class="metric">
+                            <div class="label">Total</div>
+                            <div class="value">{{ result.sem2.total }}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Passed</div>
+                            <div class="value up">{{ result.sem2.passed }} <small>({{ result.sem2.pass_pct }}%)</small>
+                            </div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Failed</div>
+                            <div class="value down">{{ result.sem2.failed }}</div>
+                        </div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric">
+                            <div class="label">Avg SGPA</div>
+                            <div class="value">{{ result.sem2.avg_sgpa }}</div>
+                        </div>
+                        <div class="metric">
+                            <div class="label">Avg Marks</div>
+                            <div class="value">{{ result.sem2.avg_marks }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-wrap">
+                    <h5>Pass Rate Comparison</h5>
+                    <canvas id="passRateChart"></canvas>
+                </div>
+                <div class="chart-wrap">
+                    <h5>Average SGPA Comparison</h5>
+                    <canvas id="sgpaChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trends -->
+        <div class="glass-card">
+            <div class="section-title">
+                <span class="badge-icon">📈</span> Student Trends ({{ result.common_count }} common students)
+            </div>
+            <div class="trend-row">
+                <div class="trend-badge improved">
+                    📈 Improved <span class="count">{{ result.improved }}</span>
+                </div>
+                <div class="trend-badge declined">
+                    📉 Declined <span class="count">{{ result.declined }}</span>
+                </div>
+                <div class="trend-badge same">
+                    ➡️ Same <span class="count">{{ result.same }}</span>
+                </div>
+            </div>
+            <div class="search-box">
+                <span>🔍</span>
+                <input type="text" placeholder="Search by Hall Ticket No..." oninput="filterTable(this,'trendTable')">
+            </div>
+            <div class="search-count" id="trendTable-count"></div>
+            <div class="table-responsive" id="trendTable">{{ result.common_html|safe }}</div>
+        </div>
+        {% endif %}
+
+        <div class="app-footer">Made with ❤️ — JNTU Topper Analyzer</div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const next = html.getAttribute('data-theme') === 'day' ? 'night' : 'day';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeIcon(next);
+            if (typeof buildCharts === 'function') buildCharts();
+        }
+        function updateThemeIcon(t) {
+            document.getElementById('themeIcon').style.opacity = t === 'night' ? '0.4' : '1';
+            document.getElementById('themeIcon2').style.opacity = t === 'night' ? '1' : '0.4';
+        }
+        (function () { const s = localStorage.getItem('theme') || 'day'; document.documentElement.setAttribute('data-theme', s); updateThemeIcon(s); })();
+
+        function filterTable(input, tableId) {
+            const q = input.value.toUpperCase().trim();
+            const rows = document.getElementById(tableId).querySelectorAll('tbody tr');
+            let shown = 0;
+            rows.forEach(r => {
+                const htno = r.cells[1] ? r.cells[1].textContent.toUpperCase() : '';
+                if (!q || htno.includes(q)) { r.classList.remove('hidden-row'); shown++; }
+                else { r.classList.add('hidden-row'); }
+            });
+            const c = document.getElementById(tableId + '-count');
+            if (c) c.textContent = q ? `Showing ${shown} of ${rows.length}` : '';
+        }
+
+        {% if result %}
+        let c1 = null, c2 = null;
+        function getColors() {
+            const n = document.documentElement.getAttribute('data-theme') === 'night';
+            return {
+                sem1: n ? 'rgba(104,211,145,0.8)' : 'rgba(72,187,120,0.8)',
+                sem2: n ? 'rgba(127,90,240,0.8)' : 'rgba(102,126,234,0.8)',
+                sem1b: n ? '#68d391' : '#48bb78',
+                sem2b: n ? '#7f5af0' : '#667eea',
+                text: n ? '#e2e8f0' : '#1a202c',
+                grid: n ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                failBg: n ? 'rgba(252,129,129,0.8)' : 'rgba(252,129,129,0.8)',
+                fail: n ? '#fc8181' : '#fc8181'
+            };
+        }
+        function buildCharts() {
+            const co = getColors();
+            if (c1) c1.destroy();
+            if (c2) c2.destroy();
+            c1 = new Chart(document.getElementById('passRateChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Sem 1', 'Sem 2'],
+                    datasets: [
+                        { label: 'Passed', data: [{{ result.sem1.passed }}, {{ result.sem2.passed }}], backgroundColor: [co.sem1, co.sem2], borderColor: [co.sem1b, co.sem2b], borderWidth: 2, borderRadius: 8
+            },
+                { label: 'Failed', data: [{{ result.sem1.failed }}, {{ result.sem2.failed }}], backgroundColor: [co.failBg, co.failBg], borderColor: [co.fail, co.fail], borderWidth: 2, borderRadius: 8 }
+      ]
+    },
+        options: {
+            responsive: true, scales: {
+                y: { beginAtZero: true, ticks: { color: co.text }, grid: { color: co.grid } },
+                x: { ticks: { color: co.text }, grid: { display: false } }
+            }, plugins: { legend: { labels: { color: co.text, font: { family: 'Inter', weight: '600' } } } }
+        }
+  });
+        c2 = new Chart(document.getElementById('sgpaChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Sem 1', 'Sem 2'],
+                datasets: [{ label: 'Avg SGPA', data: [{{ result.sem1.avg_sgpa }}, {{ result.sem2.avg_sgpa }}],
+            backgroundColor: [co.sem1, co.sem2], borderColor: [co.sem1b, co.sem2b], borderWidth: 2, borderRadius: 8, barPercentage: 0.5
+        }]
+    },
+            options: {
+                responsive: true, scales: {
+                    y: { beginAtZero: true, ticks: { color: co.text }, grid: { color: co.grid } },
+                    x: { ticks: { color: co.text }, grid: { display: false } }
+                }, plugins: { legend: { display: false } }
+        }
+  });
+}
+        document.addEventListener('DOMContentLoaded', buildCharts);
+        {% endif %}
+    </script>
+</body>
+
+</html>
