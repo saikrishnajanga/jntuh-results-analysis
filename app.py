@@ -2,9 +2,6 @@ from flask import Flask, render_template, request, send_file, jsonify
 import pandas as pd
 import os
 from fpdf import FPDF
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import tempfile
 
 app = Flask(__name__)
@@ -83,6 +80,9 @@ def add_stat_box(pdf, label, value, x, y, w=60, h=22):
 
 def create_pie_chart(labels, sizes, colors, title, filepath):
     """Create a pie chart and save as image."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(4, 3))
     wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors,
                                        autopct='%1.1f%%', startangle=90,
@@ -98,6 +98,9 @@ def create_pie_chart(labels, sizes, colors, title, filepath):
 
 def create_bar_chart(labels, values1, values2, label1, label2, title, filepath):
     """Create a grouped bar chart and save as image."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(4, 3))
     x = range(len(labels))
     width = 0.35
@@ -118,6 +121,9 @@ def create_bar_chart(labels, values1, values2, label1, label2, title, filepath):
 
 def create_single_bar_chart(labels, values, colors, title, filepath):
     """Create a simple bar chart."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(4, 3))
     bars = ax.bar(labels, values, color=colors, width=0.5)
     for bar, val in zip(bars, values):
@@ -157,25 +163,13 @@ def generate_single_pdf(by_marks, by_sgpa, failed_df, passed_count, failed_count
     add_stat_box(pdf, 'AVG SGPA', avg_sgpa, start_x + 186, y, 55)
     pdf.set_y(y + 30)
 
-    # Charts
+    # Pie Chart
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Pie chart
         pie_path = os.path.join(tmpdir, 'pie.png')
         if passed_count > 0 or failed_count > 0:
             create_pie_chart(['Passed', 'Failed'], [passed_count, failed_count],
                            ['#48bb78', '#fc8181'], 'Pass/Fail Distribution', pie_path)
-            pdf.image(pie_path, x=30, y=pdf.get_y(), w=120)
-
-        # Bar chart - Top 5 SGPA
-        bar_path = os.path.join(tmpdir, 'toppers_bar.png')
-        top5 = by_sgpa.head(5)
-        if len(top5) > 0:
-            create_single_bar_chart(
-                top5['HTNO'].tolist(), top5['SGPA'].tolist(),
-                ['#667eea', '#764ba2', '#48bb78', '#ecc94b', '#fc8181'],
-                'Top 5 Students by SGPA', bar_path
-            )
-            pdf.image(bar_path, x=160, y=pdf.get_y(), w=120)
+            pdf.image(pie_path, x=80, y=pdf.get_y(), w=130)
 
     # === PAGE 2: Top 3 Toppers ===
     pdf.add_page()
@@ -253,29 +247,6 @@ def generate_compare_pdf(result_data):
     add_stat_box(pdf, 'Avg Marks', r['sem2']['avg_marks'], 232, y2, 50)
     pdf.set_y(y2 + 30)
 
-    # Charts
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Pass rate comparison
-        bar1_path = os.path.join(tmpdir, 'pass_compare.png')
-        create_bar_chart(
-            ['Passed', 'Failed'],
-            [r['sem1']['passed'], r['sem1']['failed']],
-            [r['sem2']['passed'], r['sem2']['failed']],
-            'Semester 1', 'Semester 2',
-            'Pass Rate Comparison', bar1_path
-        )
-        pdf.image(bar1_path, x=30, y=pdf.get_y(), w=120)
-
-        # SGPA comparison
-        bar2_path = os.path.join(tmpdir, 'sgpa_compare.png')
-        create_single_bar_chart(
-            ['Sem 1', 'Sem 2'],
-            [r['sem1']['avg_sgpa'], r['sem2']['avg_sgpa']],
-            ['#667eea', '#48bb78'],
-            'Average SGPA Comparison', bar2_path
-        )
-        pdf.image(bar2_path, x=160, y=pdf.get_y(), w=120)
-
     # === PAGE 2: Trends + Table ===
     pdf.add_page()
     add_section_title(pdf, f"Student Trends ({result_data['result']['common_count']} common students)")
@@ -296,7 +267,7 @@ def generate_compare_pdf(result_data):
 
     # Clean trend column for PDF (remove emojis)
     common_clean = common.copy()
-    common_clean['TREND'] = common_clean['TREND'].str.replace('📈 ', '', regex=False).str.replace('📉 ', '', regex=False).str.replace('➡️ ', '', regex=False)
+    common_clean['TREND'] = common_clean['TREND'].astype(str).str.replace('📈 ', '', regex=False).str.replace('📉 ', '', regex=False).str.replace('➡️ ', '', regex=False)
     add_table_to_pdf(pdf, common_clean)
 
     path = os.path.join(UPLOAD_FOLDER, 'compare_output.pdf')
@@ -463,12 +434,13 @@ def compare():
                 "common_count": len(common)
             }
 
-            # Store data for PDF download
+            # Store data and pre-generate PDF for instant download
             global last_compare_data
             last_compare_data = {
                 "marks1": marks1, "marks2": marks2,
                 "common": common, "result": result
             }
+            generate_compare_pdf(last_compare_data)
 
     return render_template("compare.html", result=result)
 
@@ -488,17 +460,10 @@ def download():
 
 @app.route("/download-compare")
 def download_compare():
-    global last_compare_data
-    if not last_compare_data:
-        return "No comparison available. Please compare semesters first.", 404
-
-    generate_compare_pdf(last_compare_data)
-
-    return send_file(
-        os.path.join(UPLOAD_FOLDER, "compare_output.pdf"),
-        as_attachment=True,
-        download_name="JNTU_Comparison.pdf"
-    )
+    pdf_path = os.path.join(UPLOAD_FOLDER, "compare_output.pdf")
+    if os.path.exists(pdf_path):
+        return send_file(pdf_path, as_attachment=True, download_name="JNTU_Comparison.pdf")
+    return "No comparison available. Please compare semesters first.", 404
 
 
 if __name__ == "__main__":
