@@ -1,11 +1,57 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import pandas as pd
 import os
+from fpdf import FPDF
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Store last compare result for PDF download
+last_compare_data = {}
+
+
+def generate_pdf(dataframes_with_titles, filename):
+    """Generate a PDF with multiple tables from dataframes."""
+    pdf = FPDF(orientation='L', format='A4')
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    for title, df in dataframes_with_titles:
+        pdf.add_page()
+        pdf.set_font('Helvetica', 'B', 16)
+        pdf.set_text_color(102, 126, 234)
+        pdf.cell(0, 12, title, ln=True, align='C')
+        pdf.ln(4)
+
+        cols = list(df.columns)
+        col_count = len(cols)
+        page_width = pdf.w - 20  # margins
+        col_width = page_width / col_count
+
+        # Header
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.set_fill_color(102, 126, 234)
+        pdf.set_text_color(255, 255, 255)
+        for col in cols:
+            pdf.cell(col_width, 8, str(col), border=1, align='C', fill=True)
+        pdf.ln()
+
+        # Rows
+        pdf.set_font('Helvetica', '', 8)
+        pdf.set_text_color(30, 30, 30)
+        for i, (_, row) in enumerate(df.iterrows()):
+            if i % 2 == 0:
+                pdf.set_fill_color(245, 247, 250)
+            else:
+                pdf.set_fill_color(255, 255, 255)
+            for col in cols:
+                pdf.cell(col_width, 7, str(row[col]), border=1, align='C', fill=True)
+            pdf.ln()
+
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    pdf.output(path)
+    return path
 
 
 def process_file(path):
@@ -44,7 +90,11 @@ def process_file(path):
 
     failed_df = pd.DataFrame({"S.No": range(1, len(failed)+1), "HTNO": failed})
 
-    return by_marks, by_sgpa, failed_df
+    # Per-subject average marks across all passed students
+    avg_per_student = df_pass[df_pass["CR"]>0].groupby("HTNO")["TOTAL"].mean()
+    avg_marks_per_subject = round(avg_per_student.mean(), 2) if len(avg_per_student) > 0 else 0
+
+    return by_marks, by_sgpa, failed_df, avg_marks_per_subject
 
 
 @app.route("/", methods=["GET","POST"])
@@ -63,9 +113,13 @@ def index():
 
         file.save(path)
 
-        by_marks, by_sgpa, failed_df = process_file(path)
+        by_marks, by_sgpa, failed_df, _ = process_file(path)
 
-        by_marks.to_excel("uploads/output.xlsx", index=False)
+        generate_pdf([
+            ("Top Students by Total Marks", by_marks),
+            ("Top Students by SGPA", by_sgpa),
+            ("Failed Students", failed_df)
+        ], "output.pdf")
 
         marks = by_marks.to_html(classes="table table-bordered table-sm text-center", index=False)
 
@@ -111,8 +165,8 @@ def compare():
             file1.save(path1)
             file2.save(path2)
 
-            marks1, sgpa1, failed1 = process_file(path1)
-            marks2, sgpa2, failed2 = process_file(path2)
+            marks1, sgpa1, failed1, avg_marks1 = process_file(path1)
+            marks2, sgpa2, failed2, avg_marks2 = process_file(path2)
 
             p1 = len(marks1)
             f1 = len(failed1)
@@ -123,8 +177,7 @@ def compare():
 
             avg_sgpa1 = round(sgpa1["SGPA"].mean(), 2) if len(sgpa1) > 0 else 0
             avg_sgpa2 = round(sgpa2["SGPA"].mean(), 2) if len(sgpa2) > 0 else 0
-            avg_marks1 = round(marks1["TOTAL MARKS"].mean(), 2) if len(marks1) > 0 else 0
-            avg_marks2 = round(marks2["TOTAL MARKS"].mean(), 2) if len(marks2) > 0 else 0
+            # avg_marks already computed per-subject by process_file
 
             # Find common students and their performance change
             m1 = marks1[["HTNO","TOTAL MARKS"]].rename(columns={"TOTAL MARKS":"MARKS_SEM1"})
@@ -155,6 +208,13 @@ def compare():
                 "common_count": len(common)
             }
 
+            # Store data for PDF download
+            global last_compare_data
+            last_compare_data = {
+                "marks1": marks1, "marks2": marks2,
+                "common": common, "result": result
+            }
+
     return render_template("compare.html", result=result)
 
 
@@ -165,7 +225,41 @@ def health():
 
 @app.route("/download")
 def download():
-    return send_file("uploads/output.xlsx", as_attachment=True)
+    pdf_path = os.path.join(UPLOAD_FOLDER, "output.pdf")
+    if os.path.exists(pdf_path):
+        return send_file(pdf_path, as_attachment=True, download_name="JNTU_Analysis.pdf")
+    return "No analysis available. Please upload and analyze a file first.", 404
+
+
+@app.route("/download-compare")
+def download_compare():
+    global last_compare_data
+    if not last_compare_data:
+        return "No comparison available. Please compare semesters first.", 404
+
+    r = last_compare_data["result"]
+
+    # Create summary dataframe
+    summary = pd.DataFrame({
+        "Metric": ["Total Students", "Passed", "Failed", "Pass %", "Avg SGPA", "Avg Marks"],
+        "Semester 1": [r["sem1"]["total"], r["sem1"]["passed"], r["sem1"]["failed"],
+                       f"{r['sem1']['pass_pct']}%", r["sem1"]["avg_sgpa"], r["sem1"]["avg_marks"]],
+        "Semester 2": [r["sem2"]["total"], r["sem2"]["passed"], r["sem2"]["failed"],
+                       f"{r['sem2']['pass_pct']}%", r["sem2"]["avg_sgpa"], r["sem2"]["avg_marks"]]
+    })
+
+    common = last_compare_data["common"]
+
+    generate_pdf([
+        ("Semester Comparison Summary", summary),
+        ("Student Performance Trends", common)
+    ], "compare_output.pdf")
+
+    return send_file(
+        os.path.join(UPLOAD_FOLDER, "compare_output.pdf"),
+        as_attachment=True,
+        download_name="JNTU_Comparison.pdf"
+    )
 
 
 if __name__ == "__main__":

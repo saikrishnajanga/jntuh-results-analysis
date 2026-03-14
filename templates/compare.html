@@ -631,6 +631,9 @@
                 </div>
                 <div class="text-center mt-3">
                     <button type="submit" class="btn btn-upload">🔍 Compare Results</button>
+                    {% if result %}
+                    <a href="/download-compare" class="btn btn-download" style="background:linear-gradient(135deg,#48bb78,#38a169);border:none;color:white;padding:10px 28px;border-radius:10px;font-weight:600;font-size:0.9rem;margin-left:8px;box-shadow:0 4px 14px rgba(72,187,120,0.4);text-decoration:none;">📥 Download PDF</a>
+                    {% endif %}
                 </div>
             </form>
         </div>
