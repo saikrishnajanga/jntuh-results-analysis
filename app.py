@@ -2,54 +2,304 @@ from flask import Flask, render_template, request, send_file, jsonify
 import pandas as pd
 import os
 from fpdf import FPDF
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import tempfile
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Store last compare result for PDF download
+# Store last results for PDF download
 last_compare_data = {}
+last_single_data = {}
 
 
-def generate_pdf(dataframes_with_titles, filename):
-    """Generate a PDF with multiple tables from dataframes."""
+def add_table_to_pdf(pdf, df, max_col_width=None):
+    """Add a styled table from a dataframe to the PDF."""
+    cols = list(df.columns)
+    col_count = len(cols)
+    page_width = pdf.w - 20
+    col_width = min(page_width / col_count, max_col_width) if max_col_width else page_width / col_count
+
+    # Header
+    pdf.set_font('Helvetica', 'B', 8)
+    pdf.set_fill_color(102, 126, 234)
+    pdf.set_text_color(255, 255, 255)
+    for col in cols:
+        pdf.cell(col_width, 7, str(col), border=1, align='C', fill=True)
+    pdf.ln()
+
+    # Rows
+    pdf.set_font('Helvetica', '', 7)
+    pdf.set_text_color(30, 30, 30)
+    for i, (_, row) in enumerate(df.iterrows()):
+        if pdf.get_y() > pdf.h - 20:
+            pdf.add_page()
+            # Re-draw header
+            pdf.set_font('Helvetica', 'B', 8)
+            pdf.set_fill_color(102, 126, 234)
+            pdf.set_text_color(255, 255, 255)
+            for col in cols:
+                pdf.cell(col_width, 7, str(col), border=1, align='C', fill=True)
+            pdf.ln()
+            pdf.set_font('Helvetica', '', 7)
+            pdf.set_text_color(30, 30, 30)
+        if i % 2 == 0:
+            pdf.set_fill_color(245, 247, 250)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+        for col in cols:
+            val = str(row[col])
+            pdf.cell(col_width, 6, val, border=1, align='C', fill=True)
+        pdf.ln()
+
+
+def add_section_title(pdf, title, emoji=""):
+    """Add a styled section title."""
+    pdf.set_font('Helvetica', 'B', 14)
+    pdf.set_text_color(102, 126, 234)
+    pdf.cell(0, 10, f"{emoji}  {title}", ln=True)
+    pdf.ln(2)
+
+
+def add_stat_box(pdf, label, value, x, y, w=60, h=22):
+    """Draw a stat box at a specific position."""
+    pdf.set_xy(x, y)
+    pdf.set_fill_color(245, 247, 250)
+    pdf.set_draw_color(200, 200, 220)
+    pdf.rect(x, y, w, h, 'DF')
+    pdf.set_xy(x, y + 2)
+    pdf.set_font('Helvetica', '', 7)
+    pdf.set_text_color(120, 120, 140)
+    pdf.cell(w, 5, label, align='C')
+    pdf.set_xy(x, y + 8)
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(30, 30, 60)
+    pdf.cell(w, 10, str(value), align='C')
+
+
+def create_pie_chart(labels, sizes, colors, title, filepath):
+    """Create a pie chart and save as image."""
+    fig, ax = plt.subplots(figsize=(4, 3))
+    wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors,
+                                       autopct='%1.1f%%', startangle=90,
+                                       textprops={'fontsize': 9})
+    for t in autotexts:
+        t.set_fontsize(8)
+        t.set_fontweight('bold')
+    ax.set_title(title, fontsize=11, fontweight='bold', color='#333')
+    plt.tight_layout()
+    plt.savefig(filepath, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+
+
+def create_bar_chart(labels, values1, values2, label1, label2, title, filepath):
+    """Create a grouped bar chart and save as image."""
+    fig, ax = plt.subplots(figsize=(4, 3))
+    x = range(len(labels))
+    width = 0.35
+    bars1 = ax.bar([i - width/2 for i in x], values1, width, label=label1,
+                   color='#667eea')
+    bars2 = ax.bar([i + width/2 for i in x], values2, width, label=label2,
+                   color='#48bb78')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_title(title, fontsize=11, fontweight='bold', color='#333')
+    ax.legend(fontsize=8)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(filepath, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+
+
+def create_single_bar_chart(labels, values, colors, title, filepath):
+    """Create a simple bar chart."""
+    fig, ax = plt.subplots(figsize=(4, 3))
+    bars = ax.bar(labels, values, color=colors, width=0.5)
+    for bar, val in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + 0.5,
+                str(val), ha='center', va='bottom', fontsize=9, fontweight='bold')
+    ax.set_title(title, fontsize=11, fontweight='bold', color='#333')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(filepath, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+
+
+def generate_single_pdf(by_marks, by_sgpa, failed_df, passed_count, failed_count, pass_pct, fail_pct):
+    """Generate comprehensive PDF for single semester analysis."""
     pdf = FPDF(orientation='L', format='A4')
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    for title, df in dataframes_with_titles:
+    # === PAGE 1: Title + Stats + Charts ===
+    pdf.add_page()
+    pdf.set_font('Helvetica', 'B', 22)
+    pdf.set_text_color(102, 126, 234)
+    pdf.cell(0, 14, 'JNTU Topper Analyzer - Result Analysis', ln=True, align='C')
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 6, 'Comprehensive analysis report with rankings, charts & statistics', ln=True, align='C')
+    pdf.ln(8)
+
+    # Stats boxes
+    total = passed_count + failed_count
+    start_x = 30
+    y = pdf.get_y()
+    add_stat_box(pdf, 'TOTAL STUDENTS', total, start_x, y, 55)
+    add_stat_box(pdf, 'PASSED', f"{passed_count} ({pass_pct}%)", start_x + 62, y, 55)
+    add_stat_box(pdf, 'FAILED', f"{failed_count} ({fail_pct}%)", start_x + 124, y, 55)
+    avg_sgpa = round(by_sgpa["SGPA"].mean(), 2) if len(by_sgpa) > 0 else 0
+    add_stat_box(pdf, 'AVG SGPA', avg_sgpa, start_x + 186, y, 55)
+    pdf.set_y(y + 30)
+
+    # Charts
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Pie chart
+        pie_path = os.path.join(tmpdir, 'pie.png')
+        if passed_count > 0 or failed_count > 0:
+            create_pie_chart(['Passed', 'Failed'], [passed_count, failed_count],
+                           ['#48bb78', '#fc8181'], 'Pass/Fail Distribution', pie_path)
+            pdf.image(pie_path, x=30, y=pdf.get_y(), w=120)
+
+        # Bar chart - Top 5 SGPA
+        bar_path = os.path.join(tmpdir, 'toppers_bar.png')
+        top5 = by_sgpa.head(5)
+        if len(top5) > 0:
+            create_single_bar_chart(
+                top5['HTNO'].tolist(), top5['SGPA'].tolist(),
+                ['#667eea', '#764ba2', '#48bb78', '#ecc94b', '#fc8181'],
+                'Top 5 Students by SGPA', bar_path
+            )
+            pdf.image(bar_path, x=160, y=pdf.get_y(), w=120)
+
+    # === PAGE 2: Top 3 Toppers ===
+    pdf.add_page()
+    add_section_title(pdf, 'Top 3 Toppers by Total Marks')
+    top3_marks = by_marks.head(3).copy()
+    top3_marks['S.No'] = range(1, len(top3_marks)+1)
+    add_table_to_pdf(pdf, top3_marks)
+    pdf.ln(8)
+
+    add_section_title(pdf, 'Top 3 Toppers by SGPA')
+    top3_sgpa = by_sgpa.head(3).copy()
+    top3_sgpa['S.No'] = range(1, len(top3_sgpa)+1)
+    add_table_to_pdf(pdf, top3_sgpa)
+
+    # === PAGE 3+: Full Rankings by Marks ===
+    pdf.add_page()
+    add_section_title(pdf, 'Complete Ranking by Total Marks')
+    add_table_to_pdf(pdf, by_marks)
+
+    # === Next: Full Rankings by SGPA ===
+    pdf.add_page()
+    add_section_title(pdf, 'Complete Ranking by SGPA')
+    add_table_to_pdf(pdf, by_sgpa)
+
+    # === Next: Failed Students ===
+    if len(failed_df) > 0:
         pdf.add_page()
-        pdf.set_font('Helvetica', 'B', 16)
-        pdf.set_text_color(102, 126, 234)
-        pdf.cell(0, 12, title, ln=True, align='C')
-        pdf.ln(4)
+        add_section_title(pdf, 'Failed Students')
+        add_table_to_pdf(pdf, failed_df)
 
-        cols = list(df.columns)
-        col_count = len(cols)
-        page_width = pdf.w - 20  # margins
-        col_width = page_width / col_count
+    path = os.path.join(UPLOAD_FOLDER, 'output.pdf')
+    pdf.output(path)
+    return path
 
-        # Header
-        pdf.set_font('Helvetica', 'B', 9)
-        pdf.set_fill_color(102, 126, 234)
-        pdf.set_text_color(255, 255, 255)
-        for col in cols:
-            pdf.cell(col_width, 8, str(col), border=1, align='C', fill=True)
-        pdf.ln()
 
-        # Rows
-        pdf.set_font('Helvetica', '', 8)
-        pdf.set_text_color(30, 30, 30)
-        for i, (_, row) in enumerate(df.iterrows()):
-            if i % 2 == 0:
-                pdf.set_fill_color(245, 247, 250)
-            else:
-                pdf.set_fill_color(255, 255, 255)
-            for col in cols:
-                pdf.cell(col_width, 7, str(row[col]), border=1, align='C', fill=True)
-            pdf.ln()
+def generate_compare_pdf(result_data):
+    """Generate comprehensive PDF for compare semesters."""
+    r = result_data['result']
+    common = result_data['common']
 
-    path = os.path.join(UPLOAD_FOLDER, filename)
+    pdf = FPDF(orientation='L', format='A4')
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # === PAGE 1: Title + Overview ===
+    pdf.add_page()
+    pdf.set_font('Helvetica', 'B', 22)
+    pdf.set_text_color(102, 126, 234)
+    pdf.cell(0, 14, 'JNTU Topper Analyzer - Semester Comparison', ln=True, align='C')
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 6, 'Side-by-side comparison with charts and student trends', ln=True, align='C')
+    pdf.ln(10)
+
+    # Semester 1 stats
+    y = pdf.get_y()
+    pdf.set_font('Helvetica', 'B', 12)
+    pdf.set_text_color(102, 126, 234)
+    pdf.cell(140, 8, 'Semester 1', align='C')
+    pdf.cell(140, 8, 'Semester 2', align='C', ln=True)
+    y = pdf.get_y()
+
+    add_stat_box(pdf, 'Total', r['sem1']['total'], 10, y, 44)
+    add_stat_box(pdf, 'Passed', f"{r['sem1']['passed']} ({r['sem1']['pass_pct']}%)", 58, y, 44)
+    add_stat_box(pdf, 'Failed', r['sem1']['failed'], 106, y, 44)
+
+    add_stat_box(pdf, 'Total', r['sem2']['total'], 158, y, 44)
+    add_stat_box(pdf, 'Passed', f"{r['sem2']['passed']} ({r['sem2']['pass_pct']}%)", 206, y, 44)
+    add_stat_box(pdf, 'Failed', r['sem2']['failed'], 254, y, 44)
+    pdf.set_y(y + 28)
+
+    y2 = pdf.get_y()
+    add_stat_box(pdf, 'Avg SGPA', r['sem1']['avg_sgpa'], 30, y2, 50)
+    add_stat_box(pdf, 'Avg Marks', r['sem1']['avg_marks'], 84, y2, 50)
+    add_stat_box(pdf, 'Avg SGPA', r['sem2']['avg_sgpa'], 178, y2, 50)
+    add_stat_box(pdf, 'Avg Marks', r['sem2']['avg_marks'], 232, y2, 50)
+    pdf.set_y(y2 + 30)
+
+    # Charts
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Pass rate comparison
+        bar1_path = os.path.join(tmpdir, 'pass_compare.png')
+        create_bar_chart(
+            ['Passed', 'Failed'],
+            [r['sem1']['passed'], r['sem1']['failed']],
+            [r['sem2']['passed'], r['sem2']['failed']],
+            'Semester 1', 'Semester 2',
+            'Pass Rate Comparison', bar1_path
+        )
+        pdf.image(bar1_path, x=30, y=pdf.get_y(), w=120)
+
+        # SGPA comparison
+        bar2_path = os.path.join(tmpdir, 'sgpa_compare.png')
+        create_single_bar_chart(
+            ['Sem 1', 'Sem 2'],
+            [r['sem1']['avg_sgpa'], r['sem2']['avg_sgpa']],
+            ['#667eea', '#48bb78'],
+            'Average SGPA Comparison', bar2_path
+        )
+        pdf.image(bar2_path, x=160, y=pdf.get_y(), w=120)
+
+    # === PAGE 2: Trends + Table ===
+    pdf.add_page()
+    add_section_title(pdf, f"Student Trends ({result_data['result']['common_count']} common students)")
+
+    # Trend summary
+    pdf.set_font('Helvetica', 'B', 10)
+    improved = result_data['result']['improved']
+    declined = result_data['result']['declined']
+    same = result_data['result']['same']
+
+    pdf.set_text_color(72, 187, 120)
+    pdf.cell(80, 8, f"Improved: {improved}", align='C')
+    pdf.set_text_color(252, 129, 129)
+    pdf.cell(80, 8, f"Declined: {declined}", align='C')
+    pdf.set_text_color(236, 201, 75)
+    pdf.cell(80, 8, f"Same: {same}", align='C', ln=True)
+    pdf.ln(6)
+
+    # Clean trend column for PDF (remove emojis)
+    common_clean = common.copy()
+    common_clean['TREND'] = common_clean['TREND'].str.replace('📈 ', '', regex=False).str.replace('📉 ', '', regex=False).str.replace('➡️ ', '', regex=False)
+    add_table_to_pdf(pdf, common_clean)
+
+    path = os.path.join(UPLOAD_FOLDER, 'compare_output.pdf')
     pdf.output(path)
     return path
 
@@ -115,12 +365,6 @@ def index():
 
         by_marks, by_sgpa, failed_df, _ = process_file(path)
 
-        generate_pdf([
-            ("Top Students by Total Marks", by_marks),
-            ("Top Students by SGPA", by_sgpa),
-            ("Failed Students", failed_df)
-        ], "output.pdf")
-
         marks = by_marks.to_html(classes="table table-bordered table-sm text-center", index=False)
 
         sgpa = by_sgpa.to_html(classes="table table-bordered table-sm text-center", index=False)
@@ -143,6 +387,17 @@ def index():
         if total > 0:
             pass_pct = round(passed_count / total * 100, 1)
             fail_pct = round(failed_count / total * 100, 1)
+
+        # Generate comprehensive PDF
+        generate_single_pdf(by_marks, by_sgpa, failed_df, passed_count, failed_count, pass_pct, fail_pct)
+
+        # Store for download
+        global last_single_data
+        last_single_data = {
+            'by_marks': by_marks, 'by_sgpa': by_sgpa, 'failed_df': failed_df,
+            'passed_count': passed_count, 'failed_count': failed_count,
+            'pass_pct': pass_pct, 'fail_pct': fail_pct
+        }
 
     return render_template("index.html", marks=marks, sgpa=sgpa, failed=failed,
                            toppers_marks=toppers_marks, toppers_sgpa=toppers_sgpa,
@@ -237,23 +492,7 @@ def download_compare():
     if not last_compare_data:
         return "No comparison available. Please compare semesters first.", 404
 
-    r = last_compare_data["result"]
-
-    # Create summary dataframe
-    summary = pd.DataFrame({
-        "Metric": ["Total Students", "Passed", "Failed", "Pass %", "Avg SGPA", "Avg Marks"],
-        "Semester 1": [r["sem1"]["total"], r["sem1"]["passed"], r["sem1"]["failed"],
-                       f"{r['sem1']['pass_pct']}%", r["sem1"]["avg_sgpa"], r["sem1"]["avg_marks"]],
-        "Semester 2": [r["sem2"]["total"], r["sem2"]["passed"], r["sem2"]["failed"],
-                       f"{r['sem2']['pass_pct']}%", r["sem2"]["avg_sgpa"], r["sem2"]["avg_marks"]]
-    })
-
-    common = last_compare_data["common"]
-
-    generate_pdf([
-        ("Semester Comparison Summary", summary),
-        ("Student Performance Trends", common)
-    ], "compare_output.pdf")
+    generate_compare_pdf(last_compare_data)
 
     return send_file(
         os.path.join(UPLOAD_FOLDER, "compare_output.pdf"),
