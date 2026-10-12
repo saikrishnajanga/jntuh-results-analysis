@@ -4,10 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JNTU Topper Analyzer</title>
+  <title>AVIH Results Analyzer — JNTUH</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/modern_ui.css">
 
   <style>
     :root {
@@ -129,27 +130,41 @@
     .nav-links {
       position: relative;
       z-index: 1;
-      margin-top: 10px;
+      margin-top: 14px;
       display: flex;
-      gap: 10px;
+      gap: 12px;
       justify-content: center;
+      flex-wrap: wrap;
     }
 
     .nav-links a {
-      color: white;
+      color: rgba(255, 255, 255, 0.9);
       text-decoration: none;
-      padding: 6px 18px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 0.85rem;
+      padding: 8px 22px;
+      border-radius: 24px;
+      font-weight: 700;
+      font-size: 0.88rem;
       background: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      transition: all 0.3s;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      backdrop-filter: blur(8px);
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .nav-links a:hover,
+    .nav-links a:hover {
+      background: rgba(255, 255, 255, 0.25);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
     .nav-links a.active {
-      background: rgba(255, 255, 255, 0.3);
+      background: #ffffff;
+      color: #553c9a;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      transform: translateY(-1px);
     }
 
     /* ===== THEME TOGGLE ===== */
@@ -771,10 +786,11 @@
 
   <!-- Header -->
   <div class="app-header text-center">
-    <h1>📊 JNTU Topper Analyzer</h1>
-    <p class="subtitle">Upload your result sheet &amp; get instant analysis</p>
+    <h1>🏛️ AVIH RESULTS ANALYZER</h1>
+    <p class="subtitle">Q6-Series JNTUH Examination Result Analysis</p>
     <div class="nav-links">
-      <a href="/" class="active">📄 Single Analysis</a>
+      <a href="/" class="active">🏛️ AVIH</a>
+      <a href="/asra">🎓 ASRA</a>
       <a href="/compare">🔀 Compare Semesters</a>
     </div>
   </div>
@@ -1015,6 +1031,16 @@
           document.body.appendChild(p);
           setTimeout(() => p.remove(), 5000);
         }
+      }
+      const form = document.querySelector('form');
+      if (form) {
+        form.addEventListener('submit', function () {
+          const btn = form.querySelector('button[type="submit"]');
+          if (btn) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Analyzing...';
+            btn.style.opacity = '0.85';
+          }
+        });
       }
     });
   </script>

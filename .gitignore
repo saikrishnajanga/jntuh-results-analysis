@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.env
+.venv
+env/
+venv/
+
+# Uploaded generated temp files
+uploads/*.pdf
+uploads/asra_*
+uploads/test_*
+uploads/output.xlsx

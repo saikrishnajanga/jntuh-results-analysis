@@ -1,10 +1,14 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, session
 import pandas as pd
 import os
+import uuid
 from fpdf import FPDF
 import tempfile
+from services.asra_analyzer import analyze_asra_results
+from services.asra_pdf import generate_asra_pdf
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "jntuh-asra-topper-analyzer-2026-key")
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -12,6 +16,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Store last results for PDF download
 last_compare_data = {}
 last_single_data = {}
+last_asra_reports = {}
 
 
 def add_table_to_pdf(pdf, df, max_col_width=None):
@@ -293,11 +298,13 @@ def process_file(path):
 
     df_pass = df[~df["HTNO"].isin(failed)]
 
-    sgpa = df_pass.groupby("HTNO").apply(
-        lambda x: (x["GP"]*x["CR"]).sum()/x["CR"].sum()
-    ).reset_index(name="SGPA")
+    def _calc_sgpa(x):
+        cr_sum = x["CR"].sum()
+        return (x["GP"] * x["CR"]).sum() / cr_sum if cr_sum > 0 else 0
 
-    marks = df_pass[df_pass["CR"]>0].groupby("HTNO")["TOTAL"].sum().reset_index(name="TOTAL MARKS")
+    sgpa = df_pass.groupby("HTNO").apply(_calc_sgpa, include_groups=False).rename("SGPA").reset_index()
+
+    marks = df_pass[df_pass["CR"]>0].groupby("HTNO")["TOTAL"].sum().rename("TOTAL MARKS").reset_index()
 
     result = pd.merge(marks, sgpa)
 
@@ -309,7 +316,18 @@ def process_file(path):
     by_sgpa = result.sort_values("SGPA", ascending=False).reset_index(drop=True)
     by_sgpa.insert(0, "S.No", range(1, len(by_sgpa)+1))
 
-    failed_df = pd.DataFrame({"S.No": range(1, len(failed)+1), "HTNO": failed})
+    failed_records = []
+    for idx, ht in enumerate(failed, 1):
+        st_fails = df[(df["HTNO"] == ht) & (df["GRADE"].isin(["F", "Ab"]))]
+        sub_names = st_fails["NAME"].dropna().unique().tolist()
+        formatted_names = ", ".join([f"{i+1}. {str(n).strip()}" for i, n in enumerate(sub_names)]) if sub_names else "N/A"
+        failed_records.append({
+            "S.No": idx,
+            "HTNO": ht,
+            "Failed Count": len(st_fails),
+            "Failed Subject Names": formatted_names
+        })
+    failed_df = pd.DataFrame(failed_records) if failed_records else pd.DataFrame(columns=["S.No", "HTNO", "Failed Count", "Failed Subject Names"])
 
     # Per-subject average marks across all passed students
     avg_per_student = df_pass[df_pass["CR"]>0].groupby("HTNO")["TOTAL"].mean()
@@ -464,6 +482,87 @@ def download_compare():
     if os.path.exists(pdf_path):
         return send_file(pdf_path, as_attachment=True, download_name="JNTU_Comparison.pdf")
     return "No comparison available. Please compare semesters first.", 404
+
+
+@app.route("/asra", methods=["GET", "POST"])
+def asra():
+    result = None
+    error = None
+    college = request.args.get("college") or request.form.get("college") or session.get("asra_college", "ASRA")
+    college = str(college).upper().strip()
+    if college not in ["ASRA", "AVIH"]:
+        college = "ASRA"
+    session["asra_college"] = college
+
+    if request.method == "POST":
+        file = request.files.get("file")
+
+        if not file or not file.filename:
+            error = "Please select a valid Excel file (.xlsx) to analyze."
+            return render_template("asra.html", result=result, error=error, college=college)
+
+        try:
+            filename = f"{college.lower()}_{uuid.uuid4().hex[:8]}_{file.filename}"
+            path = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(path)
+
+            # Analyze results using ASRA/AVIH engine
+            result = analyze_asra_results(path, college=college)
+            # Update college if auto-switched by analyzer
+            college = result.get("metadata", {}).get("college", college)
+            session["asra_college"] = college
+
+            # Generate isolated PDF report
+            report_token = uuid.uuid4().hex
+            pdf_filename = f"{college.lower()}_report_{report_token}.pdf"
+            pdf_path = os.path.join(UPLOAD_FOLDER, pdf_filename)
+            generate_asra_pdf(result, pdf_path)
+
+            # Also maintain latest fallback
+            latest_pdf_path = os.path.join(UPLOAD_FOLDER, f"{college.lower()}_output_latest.pdf")
+            try:
+                import shutil
+                shutil.copyfile(pdf_path, latest_pdf_path)
+            except Exception:
+                pass
+
+            session["asra_report_token"] = report_token
+            session["asra_report_file"] = pdf_filename
+            last_asra_reports[report_token] = pdf_path
+
+        except Exception as e:
+            error = str(e)
+
+    return render_template("asra.html", result=result, error=error, college=college)
+
+
+@app.route("/download-asra")
+def download_asra():
+    college = session.get("asra_college", "ASRA")
+    download_filename = f"{college}_Result_Analysis.pdf"
+
+    # 1. Try session token
+    token = session.get("asra_report_token")
+    if token and token in last_asra_reports and os.path.exists(last_asra_reports[token]):
+        return send_file(last_asra_reports[token], as_attachment=True, download_name=download_filename)
+
+    # 2. Try session report file name
+    report_file = session.get("asra_report_file")
+    if report_file:
+        pdf_path = os.path.join(UPLOAD_FOLDER, report_file)
+        if os.path.exists(pdf_path):
+            return send_file(pdf_path, as_attachment=True, download_name=download_filename)
+
+    # 3. Fallback to college latest
+    latest_path = os.path.join(UPLOAD_FOLDER, f"{college.lower()}_output_latest.pdf")
+    if os.path.exists(latest_path):
+        return send_file(latest_path, as_attachment=True, download_name=download_filename)
+
+    fallback_any = os.path.join(UPLOAD_FOLDER, "asra_output_latest.pdf")
+    if os.path.exists(fallback_any):
+        return send_file(fallback_any, as_attachment=True, download_name=download_filename)
+
+    return f"No {college} analysis report available. Please upload and analyze a marksheet first.", 404
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html data-theme="day">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASRA Results Analyzer — JNTUH Result Analysis</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/modern_ui.css">
+
+  <style>
+    :root {
+      --bg-primary: #f0f4f8;
+      --bg-card: rgba(255, 255, 255, 0.88);
+      --bg-card-solid: #ffffff;
+      --text-primary: #1a202c;
+      --text-secondary: #4a5568;
+      --text-muted: #718096;
+      --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --accent-1: #667eea;
+      --accent-2: #764ba2;
+      --border-color: rgba(0, 0, 0, 0.08);
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+      --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
+      --table-header-bg: linear-gradient(135deg, #667eea, #764ba2);
+      --table-stripe: rgba(102, 126, 234, 0.04);
+      --success: #48bb78;
+      --danger: #fc8181;
+      --warning: #ecc94b;
+      --info: #4299e1;
+      --toggle-bg: #e2e8f0;
+      --toggle-knob: #667eea;
+      --search-bg: #ffffff;
+    }
+
+    [data-theme="night"] {
+      --bg-primary: #0f0f23;
+      --bg-card: rgba(30, 30, 60, 0.88);
+      --bg-card-solid: #1a1a3e;
+      --text-primary: #e2e8f0;
+      --text-secondary: #a0aec0;
+      --text-muted: #718096;
+      --accent-gradient: linear-gradient(135deg, #7f5af0 0%, #e040fb 100%);
+      --accent-1: #7f5af0;
+      --accent-2: #e040fb;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      --shadow-hover: 0 12px 40px rgba(127, 90, 240, 0.25);
+      --table-header-bg: linear-gradient(135deg, #7f5af0, #e040fb);
+      --table-stripe: rgba(127, 90, 240, 0.06);
+      --success: #68d391;
+      --danger: #fc8181;
+      --warning: #fbd38d;
+      --info: #63b3ed;
+      --toggle-bg: #2d2d5e;
+      --toggle-knob: #7f5af0;
+      --search-bg: #1e1e3e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background 0.4s ease, color 0.4s ease;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    [data-theme="day"] body {
+      background: linear-gradient(135deg, #f0f4f8 0%, #e8edf5 50%, #f0f4f8 100%);
+    }
+
+    [data-theme="night"] body {
+      background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0f0f23 100%);
+    }
+
+    /* ===== HEADER ===== */
+    .app-header {
+      background: var(--accent-gradient);
+      padding: 24px 0 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .app-header h1 {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.5px;
+    }
+
+    .app-header .subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.95rem;
+      margin-top: 4px;
+      margin-bottom: 14px;
+    }
+
+    .nav-links {
+      display: inline-flex;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.15);
+      padding: 5px;
+      border-radius: 30px;
+      backdrop-filter: blur(8px);
+    }
+
+    .nav-links a {
+      color: rgba(255, 255, 255, 0.85);
+      text-decoration: none;
+      padding: 7px 18px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.82rem;
+      transition: all 0.25s ease;
+    }
+
+    .nav-links a:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .nav-links a.active {
+      background: white;
+      color: #553c9a;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    /* ===== THEME TOGGLE ===== */
+    .theme-toggle-wrapper {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      z-index: 10;
+    }
+
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+
+    .theme-toggle .icon {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .theme-toggle .toggle-track {
+      width: 40px;
+      height: 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      position: relative;
+      transition: background 0.3s;
+    }
+
+    .theme-toggle .toggle-knob {
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: left 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    }
+
+    [data-theme="night"] .toggle-knob {
+      left: 22px;
+    }
+
+    /* ===== GLASS CARD ===== */
+    .glass-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--accent-gradient);
+      color: white;
+      font-size: 0.95rem;
+    }
+
+    /* ===== UPLOAD ZONE ===== */
+    .upload-zone {
+      border: 2px dashed rgba(102, 126, 234, 0.4);
+      border-radius: 14px;
+      padding: 28px;
+      text-align: center;
+      background: rgba(102, 126, 234, 0.02);
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent-1);
+      background: rgba(102, 126, 234, 0.05);
+    }
+
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 8px;
+    }
+
+    .btn-asra-primary {
+      background: var(--accent-gradient);
+      color: white;
+      border: none;
+      padding: 9px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-asra-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+      color: white;
+    }
+
+    .btn-asra-download {
+      background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+      color: white;
+      border: none;
+      padding: 9px 22px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-asra-download:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(72, 187, 120, 0.4);
+      color: white;
+    }
+
+    /* ===== METADATA BAR ===== */
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 18px;
+      background: rgba(102, 126, 234, 0.06);
+      border: 1px solid rgba(102, 126, 234, 0.15);
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    .meta-chip {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-card-solid);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+    }
+
+    /* ===== KPI CARDS GRID ===== */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .kpi-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .kpi-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-weight: 600;
+    }
+
+    /* ===== CONGRATS TOPPERS ===== */
+    .congrats-section {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.95), rgba(118, 75, 162, 0.95));
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .congrats-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .congrats-sub {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    .toppers-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .topper-card {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .topper-card h5 {
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .topper-card table {
+      width: 100%;
+      color: white;
+      font-size: 0.82rem;
+      text-align: center;
+    }
+
+    .topper-card th {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 6px;
+      border-radius: 4px;
+    }
+
+    .topper-card td {
+      padding: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* ===== CHARTS GRID ===== */
+    .charts-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .chart-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .chart-box h6 {
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      font-size: 0.88rem;
+    }
+
+    .chart-box canvas {
+      max-height: 230px;
+      width: 100% !important;
+    }
+
+    /* ===== FILTER / SEARCH BOX ===== */
+    .filter-panel {
+      background: var(--bg-card-solid);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .search-input {
+      background: var(--search-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.85rem;
+      flex: 1 1 200px;
+    }
+
+    .filter-select {
+      background: var(--search-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      min-width: 120px;
+    }
+
+    .search-input:focus, .filter-select:focus {
+      outline: none;
+      border-color: var(--accent-1);
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    }
+
+    .search-counter {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-1);
+      margin-left: auto;
+    }
+
+    /* ===== TABLES ===== */
+    .table-container {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      margin-top: 10px;
+    }
+
+    .asra-table {
+      width: 100%;
+      margin-bottom: 0;
+      font-size: 0.82rem;
+      text-align: center;
+    }
+
+    .asra-table thead th {
+      background: var(--table-header-bg);
+      color: white;
+      font-weight: 600;
+      padding: 9px 8px;
+      border: none;
+      font-size: 0.78rem;
+    }
+
+    .asra-table tbody td {
+      padding: 8px 8px;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-primary);
+      background: var(--bg-card-solid);
+    }
+
+    .asra-table tbody tr:nth-child(even) td {
+      background: var(--table-stripe);
+    }
+
+    .asra-table tbody tr:hover td {
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .badge-pass {
+      background: rgba(72, 187, 120, 0.15);
+      color: #38a169;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.74rem;
+    }
+
+    .badge-fail {
+      background: rgba(252, 129, 129, 0.15);
+      color: #e53e3e;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.74rem;
+    }
+
+    .hidden-row {
+      display: none !important;
+    }
+
+    /* ===== CONFETTI ===== */
+    @keyframes confettiFall {
+      0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    .confetti-piece {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      top: 0;
+      z-index: 9999;
+      pointer-events: none;
+      animation: confettiFall 3s ease-in forwards;
+    }
+
+    /* ===== FOOTER ===== */
+    .app-footer {
+      text-align: center;
+      padding: 24px 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: 30px;
+    }
+
+    @media (max-width: 768px) {
+      .app-header h1 { font-size: 1.35rem; }
+      .toppers-grid { grid-template-columns: 1fr; }
+      .charts-grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Theme Toggle -->
+  <div class="theme-toggle-wrapper">
+    <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Toggle Day/Night Theme">
+      <span class="icon" id="themeIcon">☀️</span>
+      <div class="toggle-track">
+        <div class="toggle-knob"></div>
+      </div>
+      <span class="icon" id="themeIcon2">🌙</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="app-header text-center">
+    <h1>🎓 ASRA RESULTS ANALYZER</h1>
+    <p class="subtitle">PT-Series JNTUH Examination Result Analysis</p>
+    <div class="nav-links">
+      <a href="/">🏛️ AVIH</a>
+      <a href="/asra" class="active">🎓 ASRA</a>
+      <a href="/compare">🔀 Compare Semesters</a>
+    </div>
+  </div>
+
+  <div class="container" style="max-width: 1040px;">
+
+    <!-- Upload Card -->
+    <div class="glass-card">
+      <div class="section-title">
+        <span class="badge-icon">📁</span> Upload PT-Series Excel Markslist
+      </div>
+      <form method="POST" enctype="multipart/form-data" action="/asra">
+        <div class="upload-zone">
+          <div class="upload-icon">📊</div>
+          <p class="mb-2" style="color:var(--text-secondary); font-weight: 500;">
+            Upload your PT-series JNTUH result Excel file (.xlsx)
+          </p>
+          <div class="d-flex justify-content-center gap-3 align-items-center flex-wrap mb-3">
+            <input type="file" name="file" accept=".xlsx" required class="form-control" style="max-width: 440px;">
+          </div>
+          <div class="d-flex gap-2 justify-content-center flex-wrap">
+            <button type="submit" class="btn-asra-primary">🚀 Analyze ASRA Results</button>
+            {% if result %}
+            <a href="/download-asra" class="btn-asra-download">📥 Download ASRA PDF Report</a>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+
+      {% if error %}
+      <div class="alert alert-danger mt-3 mb-0" role="alert">
+        <strong>Error:</strong> {{ error }}
+      </div>
+      {% endif %}
+
+      {% if result and result.warnings %}
+      <div class="alert alert-warning mt-3 mb-0" role="alert">
+        <strong>Validation Notice:</strong>
+        <ul class="mb-0 ps-3">
+          {% for w in result.warnings %}
+          <li>{{ w }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if result %}
+    <!-- Metadata Bar -->
+    <div class="meta-bar mt-3">
+      <span class="meta-chip">📄 File: {{ result.metadata.filename }}</span>
+      {% if result.metadata.title %}
+      <span class="meta-chip">🏷️ Exam: {{ result.metadata.title }}</span>
+      {% endif %}
+      <span class="meta-chip">👥 Records: {{ result.kpi.total_records_processed }}</span>
+      <span class="meta-chip">🎓 Total Candidates: {{ result.kpi.total_students }}</span>
+    </div>
+
+    <!-- 12 KPI Summary Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Students</div>
+        <div class="kpi-value">{{ result.kpi.total_students }}</div>
+        <div class="kpi-sub">Appeared</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Passed</div>
+        <div class="kpi-value" style="color:var(--success);">{{ result.kpi.passed_students }}</div>
+        <div class="kpi-sub">{{ result.kpi.pass_pct }}% Pass Rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Failed</div>
+        <div class="kpi-value" style="color:var(--danger);">{{ result.kpi.failed_students }}</div>
+        <div class="kpi-sub">{{ result.kpi.fail_pct }}% Fail Rate</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Absent</div>
+        <div class="kpi-value">{{ result.kpi.absent_students }}</div>
+        <div class="kpi-sub">Students</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Average SGPA</div>
+        <div class="kpi-value" style="color:var(--accent-1);">{{ result.kpi.avg_sgpa }}</div>
+        <div class="kpi-sub">Passed Pool</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Highest Marks</div>
+        <div class="kpi-value">{{ result.kpi.highest_marks }}</div>
+        <div class="kpi-sub">Class Peak</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Highest SGPA</div>
+        <div class="kpi-value">{{ result.kpi.highest_sgpa }}</div>
+        <div class="kpi-sub">Class Peak</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Toppers Count</div>
+        <div class="kpi-value">{{ result.kpi.eligible_toppers_count }}</div>
+        <div class="kpi-sub">Eligible Candidates</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Subjects</div>
+        <div class="kpi-value">{{ result.kpi.subjects_count }}</div>
+        <div class="kpi-sub">Total Papers</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Subject Rows</div>
+        <div class="kpi-value">{{ result.kpi.total_records_processed }}</div>
+        <div class="kpi-sub">Evaluated</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Regulation</div>
+        <div class="kpi-value" style="font-size:1.1rem;">{{ result.metadata.regulation or 'R22' }}</div>
+        <div class="kpi-sub">Academic Scheme</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Pass Ratio</div>
+        <div class="kpi-value" style="font-size:1.1rem;">{{ result.kpi.pass_pct }}%</div>
+        <div class="kpi-sub">Overall Class</div>
+      </div>
+    </div>
+
+    {% if result.toppers_marks.top3 %}
+    <!-- Congratulatory Topper Showcase -->
+    <div class="glass-card congrats-section" id="congratsSection">
+      <div class="congrats-title">🎉 Outstanding Achievements — ASRA Toppers! 🏆</div>
+      <div class="congrats-sub">Congratulations to the top performers in this examination</div>
+      <div class="toppers-grid">
+        <div class="topper-card">
+          <h5>🏅 Top 3 by Total Marks</h5>
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Hall Ticket No</th>
+                <th>Marks</th>
+                <th>SGPA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in result.toppers_marks.top3 %}
+              <tr>
+                <td><strong>#{{ t.rank }}</strong></td>
+                <td>{{ t.HTNO }}</td>
+                <td><strong>{{ t.total_marks }}</strong></td>
+                <td>{{ t.sgpa }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="topper-card">
+          <h5>🏅 Top 3 by SGPA</h5>
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Hall Ticket No</th>
+                <th>SGPA</th>
+                <th>Marks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in result.toppers_sgpa.top3 %}
+              <tr>
+                <td><strong>#{{ t.rank }}</strong></td>
+                <td>{{ t.HTNO }}</td>
+                <td><strong>{{ t.sgpa }}</strong></td>
+                <td>{{ t.total_marks }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 8 Interactive Analytics Charts -->
+    <div class="glass-card">
+      <div class="section-title">
+        <span class="badge-icon">📊</span> Interactive Examination Analytics
+      </div>
+      
+      <!-- Charts Row 1 -->
+      <div class="charts-grid-4">
+        <div class="chart-box">
+          <h6>Pass vs Fail Distribution</h6>
+          <canvas id="chartPassFail"></canvas>
+        </div>
+        <div class="chart-box">
+          <h6>Subject-Wise Pass Percentage (%)</h6>
+          <canvas id="chartSubjectPass"></canvas>
+        </div>
+        <div class="chart-box">
+          <h6>Subject Average Marks</h6>
+          <canvas id="chartSubjectAvgMarks"></canvas>
+        </div>
+        <div class="chart-box">
+          <h6>Subject Failures Count</h6>
+          <canvas id="chartSubjectFailures"></canvas>
+        </div>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="charts-grid-4">
+        <div class="chart-box">
+          <h6>Grade Distribution</h6>
+          <canvas id="chartGradeDist"></canvas>
+        </div>
+        <div class="chart-box">
+          <h6>Total Marks Distribution</h6>
+          <canvas id="chartMarksDist"></canvas>
+        </div>
+        <div class="chart-box">
+          <h6>SGPA Distribution (Passed Pool)</h6>
+          <canvas id="chartSgpaDist"></canvas>
+        </div>
+        <div class="chart-box">
+          <h6>Top 3 Toppers Marks vs SGPA</h6>
+          <canvas id="chartToppersComp"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Complete Student Results with Dynamic Multi-Filter -->
+    <div class="glass-card">
+      <div class="section-title">
+        <span class="badge-icon">📋</span> Complete Student Results
+      </div>
+      
+      <div class="filter-panel">
+        <input type="text" id="htnoSearch" class="search-input" placeholder="🔍 Search Hall Ticket No..." oninput="applyFilters()">
+
+        <select id="statusFilter" class="filter-select" onchange="applyFilters()">
+          <option value="ALL">All Status</option>
+          <option value="Passed">Passed</option>
+          <option value="Failed">Failed</option>
+        </select>
+
+        <select id="sortOption" class="filter-select" onchange="applySort()">
+          <option value="default">Sort by: Default</option>
+          <option value="marks_desc">Total Marks (High to Low)</option>
+          <option value="marks_asc">Total Marks (Low to High)</option>
+          <option value="sgpa_desc">SGPA (High to Low)</option>
+          <option value="sgpa_asc">SGPA (Low to High)</option>
+          <option value="htno">Hall Ticket No</option>
+        </select>
+
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetFilters()">Reset</button>
+        <span class="search-counter" id="studentCounter">Showing {{ result.complete_students|length }} of {{ result.complete_students|length }} students</span>
+      </div>
+
+      <div class="table-container table-responsive">
+        <table class="asra-table" id="studentsTable">
+          <thead>
+            <tr>
+              <th>S.No</th>
+              <th>Hall Ticket No</th>
+              <th>Subjects</th>
+              <th>Passed</th>
+              <th>Failed</th>
+              <th>Total Marks</th>
+              <th>SGPA</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in result.complete_students %}
+            <tr data-htno="{{ s.HTNO }}" data-status="{{ s.status }}" data-marks="{{ s.total_marks }}" data-sgpa="{{ s.sgpa }}">
+              <td>{{ s.s_no }}</td>
+              <td><strong>{{ s.HTNO }}</strong></td>
+              <td>{{ s.subjects_count }}</td>
+              <td><span style="color:var(--success); font-weight:600;">{{ s.passed_count }}</span></td>
+              <td>
+                {% if s.failed_count > 0 %}
+                <span style="color:var(--danger); font-weight:700;">{{ s.failed_count }}</span>
+                {% else %}
+                0
+                {% endif %}
+              </td>
+              <td><strong>{{ s.total_marks }}</strong></td>
+              <td>{{ s.sgpa }}</td>
+              <td>
+                {% if s.is_passed %}
+                <span class="badge-pass">✅ Passed</span>
+                {% else %}
+                <span class="badge-fail">❌ Failed</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Subject-Wise Analytics Table -->
+    <div class="glass-card">
+      <div class="section-title">
+        <span class="badge-icon">📚</span> Subject-Wise Performance Analytics
+      </div>
+      <div class="table-container table-responsive">
+        <table class="asra-table">
+          <thead>
+            <tr>
+              <th>Sub Code</th>
+              <th style="text-align: left;">Subject Name</th>
+              <th>Appeared</th>
+              <th>Passed</th>
+              <th>Failed</th>
+              <th>Pass %</th>
+              <th>Avg Marks</th>
+              <th>Highest</th>
+              <th>Lowest</th>
+              <th>Avg GP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sub in result.subjects %}
+            <tr>
+              <td><code>{{ sub.code }}</code></td>
+              <td style="text-align: left; font-weight: 500;">{{ sub.name }}</td>
+              <td>{{ sub.appeared }}</td>
+              <td><span style="color:var(--success); font-weight:600;">{{ sub.passed }}</span></td>
+              <td>
+                {% if sub.failed > 0 %}
+                <span style="color:var(--danger); font-weight:600;">{{ sub.failed }}</span>
+                {% else %}
+                0
+                {% endif %}
+              </td>
+              <td><strong>{{ sub.pass_pct }}%</strong></td>
+              <td>{{ sub.avg_marks }}</td>
+              <td>{{ sub.max_marks }}</td>
+              <td>{{ sub.min_marks }}</td>
+              <td>{{ sub.avg_gp }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Failed Students Breakdown -->
+    {% if result.failed_students %}
+    <div class="glass-card">
+      <div class="section-title" style="color:var(--danger);">
+        <span class="badge-icon" style="background:linear-gradient(135deg,#fc8181,#e53e3e);">❌</span> Failed Candidates Breakdown ({{ result.failed_students|length }})
+      </div>
+      <div class="table-container table-responsive">
+        <table class="asra-table">
+          <thead>
+            <tr>
+              <th style="width: 70px;">S.No</th>
+              <th style="width: 170px;">Hall Ticket No</th>
+              <th style="width: 150px;">Failed Count</th>
+              <th style="text-align: left;">Failed Subject Names</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fs in result.failed_students %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td><strong class="fs-6">{{ fs.HTNO }}</strong></td>
+              <td>
+                <span class="badge-fail fs-6 px-3 py-1">{{ fs.failed_count }}</span>
+              </td>
+              <td style="text-align: left; padding: 12px 16px;">
+                <div class="d-flex flex-column gap-2">
+                  {% for item in fs.failed_subjects %}
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary" style="font-size: 0.8rem; min-width: 24px; text-align: center;">{{ loop.index }}</span>
+                    <span style="color: var(--text-primary); font-weight: 600; font-size: 0.9rem;">{{ item.name }}</span>
+                  </div>
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Calculation Assumptions & Policy -->
+    <div class="glass-card mb-4">
+      <div class="section-title">
+        <span class="badge-icon">ℹ️</span> Calculation Methodology &amp; Assumptions
+      </div>
+      <ul class="mb-0" style="color:var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
+        {% for a in result.assumptions %}
+        <li>{{ a }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="app-footer">
+      JNTUH Result &amp; Topper Analyzer — ASRA Results Module &bull; Built with Flask &amp; Pandas
+    </div>
+
+  </div>
+
+  <script>
+    // ===== THEME SWITCHER =====
+    function toggleTheme() {
+      const html = document.documentElement;
+      const next = html.getAttribute('data-theme') === 'day' ? 'night' : 'day';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateThemeIcon(next);
+      if (window.renderAllCharts) window.renderAllCharts();
+    }
+
+    function updateThemeIcon(t) {
+      document.getElementById('themeIcon').style.opacity = t === 'night' ? '0.4' : '1';
+      document.getElementById('themeIcon2').style.opacity = t === 'night' ? '1' : '0.4';
+    }
+
+    (function () {
+      const s = localStorage.getItem('theme') || 'day';
+      document.documentElement.setAttribute('data-theme', s);
+      updateThemeIcon(s);
+    })();
+
+    // ===== CONFETTI EFFECT =====
+    {% if result and result.toppers_marks.top3 %}
+    document.addEventListener('DOMContentLoaded', function () {
+      const colors = ['#667eea', '#764ba2', '#f6c343', '#48bb78', '#fc8181', '#e040fb', '#ffd700'];
+      for (let i = 0; i < 45; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-piece';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        p.style.width = (Math.random() * 8 + 4) + 'px';
+        p.style.height = (Math.random() * 8 + 4) + 'px';
+        p.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        p.style.animationDuration = (Math.random() * 2 + 2) + 's';
+        p.style.animationDelay = (Math.random() * 1.5) + 's';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 5000);
+      }
+    });
+    {% endif %}
+
+    // ===== FILTER AND SEARCH =====
+    function applyFilters() {
+      const search = document.getElementById('htnoSearch').value.toUpperCase().trim();
+      const status = document.getElementById('statusFilter').value;
+
+      const rows = document.querySelectorAll('#studentsTable tbody tr');
+      let visibleCount = 0;
+
+      rows.forEach(row => {
+        const htno = row.getAttribute('data-htno') || '';
+        const rowStatus = row.getAttribute('data-status') || '';
+
+        const matchSearch = !search || htno.includes(search);
+        const matchStatus = (status === 'ALL') || (rowStatus === status);
+
+        if (matchSearch && matchStatus) {
+          row.classList.remove('hidden-row');
+          visibleCount++;
+        } else {
+          row.classList.add('hidden-row');
+        }
+      });
+
+      document.getElementById('studentCounter').textContent = `Showing ${visibleCount} of ${rows.length} students`;
+    }
+
+    function applySort() {
+      const option = document.getElementById('sortOption').value;
+      const tbody = document.querySelector('#studentsTable tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+
+      rows.sort((a, b) => {
+        const aMarks = parseFloat(a.getAttribute('data-marks')) || 0;
+        const bMarks = parseFloat(b.getAttribute('data-marks')) || 0;
+        const aSgpa = parseFloat(a.getAttribute('data-sgpa')) || 0;
+        const bSgpa = parseFloat(b.getAttribute('data-sgpa')) || 0;
+        const aHtno = a.getAttribute('data-htno') || '';
+        const bHtno = b.getAttribute('data-htno') || '';
+
+        if (option === 'marks_desc') return bMarks - aMarks;
+        if (option === 'marks_asc') return aMarks - bMarks;
+        if (option === 'sgpa_desc') return bSgpa - aSgpa;
+        if (option === 'sgpa_asc') return aSgpa - bSgpa;
+        if (option === 'htno') return aHtno.localeCompare(bHtno);
+        return 0;
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    function resetFilters() {
+      document.getElementById('htnoSearch').value = '';
+      document.getElementById('statusFilter').value = 'ALL';
+      document.getElementById('sortOption').value = 'default';
+      applyFilters();
+    }
+
+    // ===== CHART.JS ENGINE =====
+    {% if result %}
+    let charts = {};
+
+    function getThemeColors() {
+      const isNight = document.documentElement.getAttribute('data-theme') === 'night';
+      return {
+        text: isNight ? '#e2e8f0' : '#1a202c',
+        grid: isNight ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        primary: isNight ? '#7f5af0' : '#667eea',
+        success: isNight ? '#68d391' : '#48bb78',
+        danger: isNight ? '#fc8181' : '#fc8181',
+        warning: isNight ? '#fbd38d' : '#ecc94b',
+        info: isNight ? '#63b3ed' : '#4299e1'
+      };
+    }
+
+    window.renderAllCharts = function() {
+      const c = getThemeColors();
+      Object.values(charts).forEach(ch => ch.destroy());
+      charts = {};
+
+      // 1. Pass / Fail Doughnut
+      const p = {{ result.kpi.passed_students }};
+      const f = {{ result.kpi.failed_students }};
+      const ctx1 = document.getElementById('chartPassFail');
+      if (ctx1) {
+        charts.passFail = new Chart(ctx1, {
+          type: 'doughnut',
+          data: {
+            labels: ['Passed ✅', 'Failed ❌'],
+            datasets: [{
+              data: [p, f],
+              backgroundColor: [c.success, c.danger],
+              borderColor: [c.success, c.danger],
+              borderWidth: 2,
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            cutout: '58%',
+            plugins: {
+              legend: { position: 'bottom', labels: { color: c.text, font: { family: 'Inter', weight: '600' } } }
+            }
+          }
+        });
+      }
+
+      // 2. Subject Pass Percentage Bar
+      const subLabels = [{% for s in result.subjects %}'{{ s.code }}',{% endfor %}];
+      const subPass = [{% for s in result.subjects %}{{ s.pass_pct }},{% endfor %}];
+      const ctx2 = document.getElementById('chartSubjectPass');
+      if (ctx2) {
+        charts.subPass = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: subLabels,
+            datasets: [{
+              label: 'Pass %',
+              data: subPass,
+              backgroundColor: c.primary,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { max: 100, ticks: { color: c.text }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text, font: { size: 10 } }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      // 3. Subject Avg Marks
+      const subAvgMarks = [{% for s in result.subjects %}{{ s.avg_marks }},{% endfor %}];
+      const ctx3 = document.getElementById('chartSubjectAvgMarks');
+      if (ctx3) {
+        charts.subAvg = new Chart(ctx3, {
+          type: 'bar',
+          data: {
+            labels: subLabels,
+            datasets: [{
+              label: 'Avg Marks',
+              data: subAvgMarks,
+              backgroundColor: c.info,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { ticks: { color: c.text }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text, font: { size: 10 } }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      // 4. Subject Failures Count
+      const subFails = [{% for s in result.subjects %}{{ s.failed }},{% endfor %}];
+      const ctx4 = document.getElementById('chartSubjectFailures');
+      if (ctx4) {
+        charts.subFails = new Chart(ctx4, {
+          type: 'bar',
+          data: {
+            labels: subLabels,
+            datasets: [{
+              label: 'Failed Count',
+              data: subFails,
+              backgroundColor: c.danger,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: c.text, stepSize: 1 }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text, font: { size: 10 } }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      // 5. Grade Distribution
+      const gradeLabels = [{% for g, cnt in result.grade_distribution.items() %}'{{ g }}',{% endfor %}];
+      const gradeCounts = [{% for g, cnt in result.grade_distribution.items() %}{{ cnt }},{% endfor %}];
+      const ctx5 = document.getElementById('chartGradeDist');
+      if (ctx5) {
+        charts.gradeDist = new Chart(ctx5, {
+          type: 'bar',
+          data: {
+            labels: gradeLabels,
+            datasets: [{
+              label: 'Count',
+              data: gradeCounts,
+              backgroundColor: gradeLabels.map(g => (g === 'F' || g === 'AB') ? c.danger : c.success),
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: c.text }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      // 6. Marks Distribution
+      const marksLabels = [{% for k in result.marks_distribution.keys() %}'{{ k }}',{% endfor %}];
+      const marksCounts = [{% for v in result.marks_distribution.values() %}{{ v }},{% endfor %}];
+      const ctx6 = document.getElementById('chartMarksDist');
+      if (ctx6) {
+        charts.marksDist = new Chart(ctx6, {
+          type: 'bar',
+          data: {
+            labels: marksLabels,
+            datasets: [{
+              label: 'Students',
+              data: marksCounts,
+              backgroundColor: c.primary,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: c.text, stepSize: 1 }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      // 7. SGPA Distribution
+      const sgpaLabels = [{% for k in result.sgpa_distribution.keys() %}'{{ k }}',{% endfor %}];
+      const sgpaCounts = [{% for v in result.sgpa_distribution.values() %}{{ v }},{% endfor %}];
+      const ctx7 = document.getElementById('chartSgpaDist');
+      if (ctx7) {
+        charts.sgpaDist = new Chart(ctx7, {
+          type: 'bar',
+          data: {
+            labels: sgpaLabels,
+            datasets: [{
+              label: 'Passed Students',
+              data: sgpaCounts,
+              backgroundColor: c.warning,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: c.text, stepSize: 1 }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      // 8. Toppers Comparison
+      const topLabels = [{% for t in result.toppers_marks.top3 %}'{{ t.HTNO }}',{% endfor %}];
+      const topMarks = [{% for t in result.toppers_marks.top3 %}{{ t.total_marks }},{% endfor %}];
+      const ctx8 = document.getElementById('chartToppersComp');
+      if (ctx8) {
+        charts.toppersComp = new Chart(ctx8, {
+          type: 'bar',
+          data: {
+            labels: topLabels,
+            datasets: [{
+              label: 'Total Marks',
+              data: topMarks,
+              backgroundColor: c.primary,
+              borderRadius: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { beginAtZero: true, ticks: { color: c.text }, grid: { color: c.grid } },
+              x: { ticks: { color: c.text }, grid: { display: false } }
+            }
+          }
+        });
+      }
+    };
+    {% endif %}
+
+    document.addEventListener('DOMContentLoaded', function () {
+      {% if result and result.subjects %}
+      window.renderAllCharts();
+      {% endif %}
+      const form = document.querySelector('form');
+      if (form) {
+        form.addEventListener('submit', function () {
+          const btn = form.querySelector('button[type="submit"]');
+          if (btn) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Analyzing ASRA Results...';
+            btn.style.opacity = '0.85';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+
+</html>
